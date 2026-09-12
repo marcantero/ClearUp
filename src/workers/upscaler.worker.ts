@@ -1,4 +1,4 @@
-import { pipeline, RawImage, env } from '@huggingface/transformers';
+import * as ort from 'onnxruntime-web/webgpu';
 
 // Re-export types for main thread to import
 export type {
@@ -20,37 +20,23 @@ interface PostableMessage {
   [key: string]: any;
 }
 
-// Optional: Configure environment for production
-env.allowLocalModels = false;
+// Config ONNX runtime
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
 let initialized = false;
-let upscalerPromise: Promise<any> | null = null;
-let currentDevice = 'wasm'; // Track which mode we're using
+let sessionPromise: Promise<ort.InferenceSession> | null = null;
+let currentDevice = 'wasm'; 
 
-// Helper function to handle progress messages
-function handleProgress(data: any) {
-  if (data.status === 'progress') {
-    self.postMessage({
-      type: 'model-progress',
-      progress: Math.round(data.progress),
-      phase: data.file ? `Downloading: ${data.file} (${currentDevice})` : `Preparing model (${currentDevice})...`
-    });
-  } else if (data.status === 'ready') {
-    self.postMessage({
-      type: 'model-progress',
-      progress: 100,
-      phase: `Model Swin2SR loaded and ready (${currentDevice})`
-    });
-  }
-}
+// Utilitzem un model Real-ESRGAN x4 en format ONNX publicat a HuggingFace
+const MODEL_URL = 'https://huggingface.co/KingPro100/real-esrgan-onxx/resolve/main/Real-ESRGAN-x4plus.onnx';
 
-async function getUpscaler() {
-  if (!upscalerPromise) {
-    upscalerPromise = new Promise(async (resolve, reject) => {
-      // 1. Check if WebGPU is REALLY available before initializing AI
+async function getSession() {
+  if (!sessionPromise) {
+    sessionPromise = new Promise(async (resolve, reject) => {
       let isWebGPUSupported = false;
       try {
-        // @ts-ignore - navigator.gpu might not be strictly typed in older TS configs
+        // @ts-ignore - navigator.gpu might not be strictly typed
         if (navigator.gpu) {
           // @ts-ignore
           const adapter = await navigator.gpu.requestAdapter();
@@ -63,36 +49,59 @@ async function getUpscaler() {
       }
 
       currentDevice = isWebGPUSupported ? 'webgpu' : 'wasm';
-      // If we're in WASM (CPU), use 'q8' (quantized to 8 bits) to avoid hanging the tab
-      const dtype = isWebGPUSupported ? 'fp32' : 'q8'; 
 
-      console.log(`[Worker] Initializing pipeline with device: ${currentDevice} and precision: ${dtype}`);
+      console.log(`[Worker] Initializing ONNX session amb el dispositiu: ${currentDevice}`);
       
       self.postMessage({
         type: 'status',
         status: 'loading-model',
-        message: isWebGPUSupported 
-          ? "Loading high-precision model (WebGPU)..." 
-          : "WebGPU not detected. Loading CPU mode (WASM)...",
+        message: isWebGPUSupported ? "Carregant model Real-ESRGAN (WebGPU)..." : "Carregant model Real-ESRGAN (CPU)...",
+      });
+
+      self.postMessage({
+        type: 'model-progress',
+        progress: 0,
+        phase: `Descarregant model Real-ESRGAN (${currentDevice})...`
       });
 
       try {
-        // 2. Call the pipeline once using the safe method
-        const pipe = await pipeline('image-to-image', 'Xenova/swin2SR-classical-sr-x2-64', {
-          device: currentDevice as any,
-          dtype: dtype as any,
-          progress_callback: handleProgress
+        const session = await ort.InferenceSession.create(MODEL_URL, {
+          executionProviders: [currentDevice],
+          graphOptimizationLevel: 'all'
         });
         
-        console.log(`[Worker] Model successfully loaded using ${currentDevice}!`);
-        resolve(pipe);
+        self.postMessage({
+          type: 'model-progress',
+          progress: 100,
+          phase: `Model Real-ESRGAN preparat (${currentDevice})`
+        });
+
+        console.log(`[Worker] Model carregat correctament utilitzant ${currentDevice}!`);
+        resolve(session);
       } catch (error: any) {
-        console.error(`[Worker] Critical error loading model with ${currentDevice}:`, error);
-        reject(new Error(`Could not load the model. Detail: ${error?.message || error}`));
+        console.error(`[Worker] Error crític carregant el model amb ${currentDevice}:`, error);
+        
+        // Fallback a WASM si WebGPU falla
+        if (currentDevice === 'webgpu') {
+          try {
+             currentDevice = 'wasm';
+             console.log("[Worker] Fent fallback a WASM.");
+             const fallbackSession = await ort.InferenceSession.create(MODEL_URL, {
+               executionProviders: ['wasm'],
+               graphOptimizationLevel: 'all'
+             });
+             resolve(fallbackSession);
+             return;
+          } catch(e) {
+             reject(new Error(`No s'ha pogut carregar el model. Detall: ${error?.message || error}`));
+          }
+        } else {
+          reject(new Error(`No s'ha pogut carregar el model. Detall: ${error?.message || error}`));
+        }
       }
     });
   }
-  return upscalerPromise;
+  return sessionPromise;
 }
 
 async function initUpscaler(): Promise<void> {
@@ -101,57 +110,123 @@ async function initUpscaler(): Promise<void> {
   }
 
   try {
-    self.postMessage({
-      type: 'status',
-      status: 'loading-model',
-      message: "Initializing Swin2SR x2 model...",
-    });
-
-    await getUpscaler();
-
+    await getSession();
     initialized = true;
     self.postMessage({
       type: 'status',
       status: 'ready',
-      message: `Model Swin2SR ready to process (${currentDevice}).`,
+      message: `Model Real-ESRGAN a punt per processar (${currentDevice}).`,
     });
   } catch (error: any) {
-    console.error('[Worker] Error during initialization:', error);
+    console.error('[Worker] Error en la inicialització:', error);
     self.postMessage({
       type: 'status',
       status: 'error',
-      message: error?.message || 'Error during model initialization. Check console.',
+      message: error?.message || 'Error en inicialitzar el model. Revisa la consola.',
     });
   }
 }
 
 async function upscaleImage(imageData: ImageData): Promise<ImageData> {
-  const upscaler = await getUpscaler();
+  const session = await getSession();
   
-  // Transformers.js v3 requires RawImage
-  const imageToProcess = new RawImage(imageData.data, imageData.width, imageData.height, 4);
+  const width = imageData.width;
+  const height = imageData.height;
+  const numChannels = 3; // RGB
   
-  // Execute the pipeline
-  const outputs = await upscaler(imageToProcess);
+  const TILE_SIZE = 128;
+  const SCALE = 4;
+  const OUT_TILE_SIZE = TILE_SIZE * SCALE;
   
-  // Output could be an array or an object depending on the pipeline
-  const finalImage = Array.isArray(outputs) ? outputs[0] : outputs;
+  const outWidth = width * SCALE;
+  const outHeight = height * SCALE;
+  const outClampedData = new Uint8ClampedArray(outWidth * outHeight * 4);
   
-  if (finalImage instanceof RawImage || finalImage.data) {
-     // Create a new canvas to draw the RawImage so we can properly extract ImageData with RGBA
-     // Often the output of these models is RGB (3 channels).
-     const outCanvas = new OffscreenCanvas(finalImage.width, finalImage.height);
-     const outCtx = outCanvas.getContext('2d');
-     if (!outCtx) throw new Error('Failed to create 2D context.');
-     
-     // Convert RawImage to blob, then to bitmap, then draw to extract clean RGBA ImageData
-     const blob = await finalImage.toBlob();
-     const bitmap = await createImageBitmap(blob);
-     outCtx.drawImage(bitmap, 0, 0);
-     return outCtx.getImageData(0, 0, finalImage.width, finalImage.height);
+  const numTilesX = Math.ceil(width / TILE_SIZE);
+  const numTilesY = Math.ceil(height / TILE_SIZE);
+  const totalTiles = numTilesX * numTilesY;
+  
+  let processedTiles = 0;
+  
+  for (let ty = 0; ty < numTilesY; ty++) {
+    for (let tx = 0; tx < numTilesX; tx++) {
+      const tileFloat32Data = new Float32Array(1 * numChannels * TILE_SIZE * TILE_SIZE);
+      
+      const startX = tx * TILE_SIZE;
+      const startY = ty * TILE_SIZE;
+      
+      // Extreure el tile (omplint amb 0 si ens passem de la imatge)
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          const imgY = startY + y;
+          const imgX = startX + x;
+          
+          let r = 0, g = 0, b = 0;
+          if (imgX < width && imgY < height) {
+            const srcIndex = (imgY * width + imgX) * 4;
+            r = imageData.data[srcIndex] / 255.0;
+            g = imageData.data[srcIndex + 1] / 255.0;
+            b = imageData.data[srcIndex + 2] / 255.0;
+          }
+          
+          const dstIndexR = 0 * (TILE_SIZE * TILE_SIZE) + y * TILE_SIZE + x;
+          const dstIndexG = 1 * (TILE_SIZE * TILE_SIZE) + y * TILE_SIZE + x;
+          const dstIndexB = 2 * (TILE_SIZE * TILE_SIZE) + y * TILE_SIZE + x;
+          
+          tileFloat32Data[dstIndexR] = r;
+          tileFloat32Data[dstIndexG] = g;
+          tileFloat32Data[dstIndexB] = b;
+        }
+      }
+      
+      const inputTensor = new ort.Tensor('float32', tileFloat32Data, [1, 3, TILE_SIZE, TILE_SIZE]);
+      
+      const feeds: Record<string, ort.Tensor> = {};
+      feeds[session.inputNames[0]] = inputTensor;
+      
+      // Executar el model només pel tile
+      const results = await session.run(feeds);
+      const outputTensor = results[session.outputNames[0]];
+      const outFloat32Data = outputTensor.data as Float32Array;
+      
+      // Col·locar el tile de sortida a la imatge final
+      for (let y = 0; y < OUT_TILE_SIZE; y++) {
+        for (let x = 0; x < OUT_TILE_SIZE; x++) {
+          const outImgY = startY * SCALE + y;
+          const outImgX = startX * SCALE + x;
+          
+          if (outImgX < outWidth && outImgY < outHeight) {
+            const rIndex = 0 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + y * OUT_TILE_SIZE + x;
+            const gIndex = 1 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + y * OUT_TILE_SIZE + x;
+            const bIndex = 2 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + y * OUT_TILE_SIZE + x;
+            
+            let r = outFloat32Data[rIndex] * 255.0;
+            let g = outFloat32Data[gIndex] * 255.0;
+            let b = outFloat32Data[bIndex] * 255.0;
+            
+            r = Math.max(0, Math.min(255, Math.round(r)));
+            g = Math.max(0, Math.min(255, Math.round(g)));
+            b = Math.max(0, Math.min(255, Math.round(b)));
+            
+            const dstIndex = (outImgY * outWidth + outImgX) * 4;
+            outClampedData[dstIndex] = r;
+            outClampedData[dstIndex + 1] = g;
+            outClampedData[dstIndex + 2] = b;
+            outClampedData[dstIndex + 3] = 255;
+          }
+        }
+      }
+      
+      processedTiles++;
+      self.postMessage({
+        type: 'model-progress',
+        progress: Math.round((processedTiles / totalTiles) * 100),
+        phase: `Processant: ${processedTiles}/${totalTiles} blocs (${currentDevice})`
+      });
+    }
   }
-
-  throw new Error('Failed to process image output.');
+  
+  return new ImageData(outClampedData, outWidth, outHeight);
 }
 
 self.onmessage = async (event: MessageEvent<PostableMessage>) => {
@@ -166,7 +241,7 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
     try {
       await initUpscaler();
     } catch (error: any) {
-      console.error('[Worker] Error in init:', error);
+      console.error('[Worker] Error en init:', error);
       self.postMessage({
         type: 'status',
         status: 'error',
@@ -202,7 +277,7 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
         status: 'finished',
       });
     } catch (error: any) {
-      console.error('[Worker] Error in process-image:', error);
+      console.error('[Worker] Error en process-image:', error);
       self.postMessage({
         type: 'error',
         id,

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { sileo } from 'sileo';
-import UpscalerWorker from '../workers/upscaler.worker?worker';
+import BackgroundRemoverWorker from '../workers/backgroundRemover.worker?worker';
 import type {
   WorkerIncomingMessage,
   WorkerOutgoingMessage,
   WorkerResultMessage,
   WorkerStatusMessage,
-} from '../workers/upscaler.types';
+} from '../workers/backgroundRemover.types';
 
 type UploadStatus = 'idle' | 'uploading' | 'loaded';
 type ProcessingStatus = 'idle' | 'processing' | 'done' | 'error';
@@ -18,10 +18,10 @@ export type WorkerState = {
   processingStatus: ProcessingStatus;
 };
 
-export const IMAGE_PROCESS_ID = 'clearup-active-image-job';
-const TOAST_MODEL_ID = 'clear-up-model-loader';
+export const IMAGE_PROCESS_ID = 'clearcut-active-image-job';
+const TOAST_MODEL_ID = 'clear-cut-model-loader';
 
-export function useUpscalerWorker(
+export function useBackgroundWorker(
   latestRequestIdRef: React.MutableRefObject<string | null>,
   onSuccess: (id: string, imageData: ImageData) => void
 ) {
@@ -32,12 +32,13 @@ export function useUpscalerWorker(
   });
 
   const workerRef = useRef<Worker | null>(null);
-  const lastProgressUpdateRef = useRef(0);
+  const lastProgressUpdateRef = useRef(0); // <-- CLAU: Evita saturar Sileo
 
   useEffect(() => {
-    const worker = new UpscalerWorker();
+    const worker = new BackgroundRemoverWorker();
     workerRef.current = worker;
 
+    // Estat inicial
     sileo.info({
       id: TOAST_MODEL_ID,
       title: 'Initializing AI',
@@ -50,6 +51,7 @@ export function useUpscalerWorker(
 
       if (message.type === 'model-progress') {
         const now = Date.now();
+        // Limitem actualitzacions a un cop cada 150ms
         if (now - lastProgressUpdateRef.current < 150) return;
         lastProgressUpdateRef.current = now;
 
@@ -79,6 +81,7 @@ export function useUpscalerWorker(
       if (message.type === 'status') {
         if (message.status === 'ready') {
           setState((prev) => ({ ...prev, modelStatus: 'ready' }));
+          // Esperem 800ms abans de l'èxit per no ser bruscos
           setTimeout(() => {
             sileo.success({
               id: TOAST_MODEL_ID,
@@ -107,7 +110,7 @@ export function useUpscalerWorker(
 
         sileo.success({
           id: IMAGE_PROCESS_ID,
-          title: 'Image upscaled',
+          title: 'Background removed',
           duration: 2200,
         });
 
@@ -149,6 +152,7 @@ export function useUpscalerWorker(
     };
   }, [onSuccess, latestRequestIdRef]);
 
+  // Timeout de seguretat de 25s si la connexió s'ha quedat penjada
   useEffect(() => {
     if (state.modelStatus !== 'loading') return;
     const timeoutId = window.setTimeout(() => {

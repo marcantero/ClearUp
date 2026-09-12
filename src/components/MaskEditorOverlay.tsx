@@ -402,11 +402,11 @@ export function MaskEditorOverlay({
         <div className="h-5 w-px bg-slate-200 dark:bg-white/[0.08]" />
 
         <div className="flex items-center gap-0.5 rounded-lg border border-slate-200/80 bg-slate-100 p-0.5 dark:border-white/[0.06] dark:bg-black/20">
-          <ToolBtn active={activeTool === 'brush'} activeClass="bg-white text-cyan-700 border border-slate-200/80 shadow-sm dark:border-transparent dark:bg-cyan-500/20 dark:text-cyan-300 dark:shadow-none" onClick={() => setActiveTool('brush')} title="Freehand brush">
+          <ToolBtn active={activeTool === 'brush'} activeClass="bg-white text-red-700 border border-slate-200/80 shadow-sm dark:border-transparent dark:bg-red-500/20 dark:text-red-300 dark:shadow-none" onClick={() => setActiveTool('brush')} title="Freehand brush">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
             Brush
           </ToolBtn>
-          <ToolBtn active={activeTool === 'smart'} activeClass="bg-white text-cyan-700 border border-slate-200/80 shadow-sm dark:border-transparent dark:bg-cyan-500/20 dark:text-cyan-300 dark:shadow-none" onClick={() => setActiveTool('smart')} title="Smart brush">
+          <ToolBtn active={activeTool === 'smart'} activeClass="bg-white text-red-700 border border-slate-200/80 shadow-sm dark:border-transparent dark:bg-red-500/20 dark:text-red-300 dark:shadow-none" onClick={() => setActiveTool('smart')} title="Smart brush">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>
             Smart
           </ToolBtn>
@@ -418,8 +418,8 @@ export function MaskEditorOverlay({
           <span className="text-[9px] font-medium uppercase tracking-widest text-slate-400 dark:text-slate-600">Size</span>
           <div className="flex items-center gap-1">
             {BRUSH_SIZES.map((size) => (
-              <button key={size} type="button" onClick={() => setBrushSize(size)} title={`${size}px`} className={`flex h-6 w-6 items-center justify-center rounded-full transition-all ${brushSize === size ? 'bg-cyan-50 dark:bg-cyan-400/15 ring-1 ring-cyan-500/40 dark:ring-cyan-400/50' : 'hover:bg-slate-100 dark:hover:bg-white/[0.05]'}`}>
-                <span className={`rounded-full transition-colors ${brushSize === size ? 'bg-cyan-600 dark:bg-cyan-400' : 'bg-slate-400 dark:bg-slate-600'}`} style={{ width: Math.max(3, Math.min(14, size / 5)), height: Math.max(3, Math.min(14, size / 5)) }} />
+              <button key={size} type="button" onClick={() => setBrushSize(size)} title={`${size}px`} className={`flex h-6 w-6 items-center justify-center rounded-full transition-all ${brushSize === size ? 'bg-red-50 dark:bg-red-400/15 ring-1 ring-red-500/40 dark:ring-red-400/50' : 'hover:bg-slate-100 dark:hover:bg-white/[0.05]'}`}>
+                <span className={`rounded-full transition-colors ${brushSize === size ? 'bg-red-600 dark:bg-red-400' : 'bg-slate-400 dark:bg-slate-600'}`} style={{ width: Math.max(3, Math.min(14, size / 5)), height: Math.max(3, Math.min(14, size / 5)) }} />
               </button>
             ))}
           </div>
@@ -432,7 +432,7 @@ export function MaskEditorOverlay({
               <span className="text-[9px] font-medium uppercase tracking-widest text-slate-400 dark:text-slate-600">Tolerance</span>
               <div className="flex items-center gap-0.5">
                 {TOLERANCE_PRESETS.map(({ label, value }) => (
-                  <button key={value} type="button" onClick={() => setTolerance(value)} title={`RGB distance ≤ ${value}`} className={`rounded-md px-2 py-1 text-[10px] font-medium transition-all ${tolerance === value ? 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-500/30 dark:bg-cyan-400/15 dark:text-cyan-300 dark:ring-cyan-400/40' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}>
+                  <button key={value} type="button" onClick={() => setTolerance(value)} title={`RGB distance ≤ ${value}`} className={`rounded-md px-2 py-1 text-[10px] font-medium transition-all ${tolerance === value ? 'bg-red-50 text-red-700 ring-1 ring-red-500/30 dark:bg-red-400/15 dark:text-red-300 dark:ring-red-400/40' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}>
                     {label}
                   </button>
                 ))}

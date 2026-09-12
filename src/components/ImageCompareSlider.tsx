@@ -134,7 +134,7 @@ export function ImageCompareSlider({
         aria-label="Comparació d'imatges abans i després"
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        className="relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl cursor-col-resize select-none focus:outline-none focus:ring-2 focus:ring-cyan-400 group transition-transform duration-300 ease-out hover:scale-[1.01] hover:shadow-[0_22px_70px_rgba(15,23,42,0.95)]"
+        className="relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl cursor-col-resize select-none focus:outline-none focus:ring-2 focus:ring-red-400 group transition-transform duration-300 ease-out hover:scale-[1.01] hover:shadow-[0_22px_70px_rgba(15,23,42,0.95)]"
         onPointerDown={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           updatePosition(((e.clientX - rect.left) / rect.width) * 100);

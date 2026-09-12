@@ -106,14 +106,14 @@ function App() {
 		{/* Bombolla interactiva (el "blob" del ratolí) */}
 		<div 
 			ref={blobRef}
-			className="pointer-events-none fixed h-96 w-96 rounded-full bg-cyan-500/20 blur-[128px] dark:bg-cyan-500/10 transition-transform duration-500 ease-out will-change-transform"
+			className="pointer-events-none fixed h-96 w-96 rounded-full bg-red-500/20 blur-[128px] dark:bg-red-500/10 transition-transform duration-500 ease-out will-change-transform"
 		/>
 		
 		{/* Bombolles orgàniques */}
 		{/* He rebaixat l'opacitat en mode light perquè no siguin massa invasives */}
-		<div className="absolute -top-[10%] -left-[10%] h-[600px] w-[600px] rounded-full bg-cyan-500/20 blur-[128px] dark:bg-cyan-500/10 animate-drift" />
-		<div className="absolute top-[20%] -right-[10%] h-[500px] w-[500px] rounded-full bg-teal-500/20 blur-[128px] dark:bg-teal-500/10 animate-swirl [animation-delay:-7s]" />
-		<div className="absolute -bottom-[10%] left-[20%] h-[400px] w-[400px] rounded-full bg-indigo-500/20 blur-[128px] dark:bg-indigo-500/10 animate-breathe [animation-delay:-4s]" />
+		<div className="absolute -top-[10%] -left-[10%] h-[600px] w-[600px] rounded-full bg-red-500/20 blur-[128px] dark:bg-red-500/10 animate-drift" />
+		<div className="absolute top-[20%] -right-[10%] h-[500px] w-[500px] rounded-full bg-orange-500/20 blur-[128px] dark:bg-orange-500/10 animate-swirl [animation-delay:-7s]" />
+		<div className="absolute -bottom-[10%] left-[20%] h-[400px] w-[400px] rounded-full bg-rose-500/20 blur-[128px] dark:bg-rose-500/10 animate-breathe [animation-delay:-4s]" />
 		</div>
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header
@@ -185,13 +185,13 @@ function App() {
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
             
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-medium text-cyan-700 dark:text-cyan-300 ring-1 ring-cyan-500/20">
-                <span className="h-1 w-1 rounded-full bg-cyan-500 dark:bg-cyan-400" />
+              <div className="inline-flex items-center gap-2 rounded-full bg-red-500/10 px-3 py-1 text-[11px] font-medium text-red-700 dark:text-red-300 ring-1 ring-red-500/20">
+                <span className="h-1 w-1 rounded-full bg-red-500 dark:bg-red-400" />
                 Runs entirely in your browser — no uploads, no server
               </div>
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
                 Upscale images<br />
-                <span className="bg-gradient-to-r from-cyan-600 to-teal-600 dark:from-cyan-300 dark:to-teal-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-300 dark:to-orange-400 bg-clip-text text-transparent">
                   instantly.
                 </span>
               </h1>
@@ -210,7 +210,7 @@ function App() {
 				<p className="text-xs font-medium text-slate-500 dark:text-slate-400">
 					{isProcessing ? (
 					<span className="inline-flex items-center gap-2">
-						<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-500 dark:bg-cyan-400" />
+						<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500 dark:bg-red-400" />
 						Upscaling image…
 					</span>
 					) : null}
@@ -220,7 +220,7 @@ function App() {
 					<button 
 					type="button" 
 					onClick={onDownload} 
-					className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-cyan-500 px-6 py-2.5 text-sm font-bold text-slate-950 transition-all hover:scale-[1.02] hover:bg-cyan-400 hover:shadow-[0_0_20px_-5px_rgba(34,211,238,0.5)] active:scale-[0.98]"
+					className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-red-500 px-6 py-2.5 text-sm font-bold text-slate-950 transition-all hover:scale-[1.02] hover:bg-red-400 hover:shadow-[0_0_20px_-5px_rgba(34,211,238,0.5)] active:scale-[0.98]"
 					>
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
 						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -236,7 +236,7 @@ function App() {
                 ) : (
                   <div className="flex h-56 items-center justify-center rounded-2xl border border-slate-200 dark:border-white/[0.06] bg-slate-100 dark:bg-white/[0.02]">
                     <div className="flex flex-col items-center gap-2">
-                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan-500 dark:bg-cyan-400" />
+                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500 dark:bg-red-400" />
                       <span className="text-[11px] text-slate-500">Processing…</span>
                     </div>
                   </div>
@@ -257,15 +257,15 @@ function App() {
         toastOptions={{
           duration: 3500,
           classNames: {
-            toast: '!rounded-2xl border bg-white text-slate-900 border-slate-200 shadow-xl dark:bg-[#0b1220] dark:text-slate-50 dark:border-cyan-500/20 dark:shadow-[0_20px_60px_rgba(0,0,0,0.5)] !backdrop-blur-xl transition-all duration-300',
+            toast: '!rounded-2xl border bg-white text-slate-900 border-slate-200 shadow-xl dark:bg-[#0b1220] dark:text-slate-50 dark:border-red-500/20 dark:shadow-[0_20px_60px_rgba(0,0,0,0.5)] !backdrop-blur-xl transition-all duration-300',
             title: '!font-semibold text-slate-900 dark:text-white',
             description: 'text-slate-500 dark:text-slate-400',
-            icon: 'text-cyan-500 dark:text-cyan-400',
+            icon: 'text-red-500 dark:text-red-400',
             success: '!border-emerald-500/30',
             error: '!border-red-500/30',
             warning: '!border-amber-500/30',
-            info: '!border-cyan-500/30',
-            closeButton: 'bg-slate-50 dark:bg-[#0f172a] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-cyan-500/15 hover:bg-slate-100 dark:hover:bg-[#1e293b]',
+            info: '!border-red-500/30',
+            closeButton: 'bg-slate-50 dark:bg-[#0f172a] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-red-500/15 hover:bg-slate-100 dark:hover:bg-[#1e293b]',
           },
         }}
       />

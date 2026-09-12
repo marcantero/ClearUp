@@ -44,7 +44,7 @@ export function ModelStatusBanner({ status, message, progress, phase }: ModelSta
           <div className="mt-2.5 space-y-1">
             <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-teal-400 transition-[width] duration-300 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-red-400 to-orange-400 transition-[width] duration-300 ease-out"
                 style={{ width: barW }}
               />
             </div>
