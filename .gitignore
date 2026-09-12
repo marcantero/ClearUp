@@ -1,0 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Node modules
+node_modules/
+
+# Build output
+.dist/
+dist/
+build/
+
+# Vite cache
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Mac / Windows system files
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.*
+
+# Coverage
+coverage/
+
+# Temporary files
+.tmp/
+.temp/
+/clearcut-training
+/venv
