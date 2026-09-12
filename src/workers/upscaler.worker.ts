@@ -36,7 +36,6 @@ async function getSession() {
     sessionPromise = new Promise(async (resolve, reject) => {
       let isWebGPUSupported = false;
       try {
-        // @ts-ignore - navigator.gpu might not be strictly typed
         if (navigator.gpu) {
           // @ts-ignore
           const adapter = await navigator.gpu.requestAdapter();
@@ -61,11 +60,65 @@ async function getSession() {
       self.postMessage({
         type: 'model-progress',
         progress: 0,
-        phase: `Descarregant model Real-ESRGAN (${currentDevice})...`
+        phase: `Connectant per descarregar el model...`
       });
 
       try {
-        const session = await ort.InferenceSession.create(MODEL_URL, {
+        // Descarregar manualment per tenir una barra de progrés real
+        const response = await fetch(MODEL_URL);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const contentLength = response.headers.get('content-length');
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
+        
+        let loaded = 0;
+        const reader = response.body?.getReader();
+        const chunks: Uint8Array[] = [];
+        
+        let lastProgress = 0;
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              chunks.push(value);
+              loaded += value.length;
+              if (total > 0) {
+                const progress = Math.round((loaded / total) * 100);
+                if (progress > lastProgress + 2) { // Refrescar cada 2% per no saturar
+                  lastProgress = progress;
+                  self.postMessage({
+                    type: 'model-progress',
+                    progress: progress,
+                    phase: `Descarregant model Real-ESRGAN (${currentDevice})...`
+                  });
+                }
+              }
+            }
+          }
+        }
+        
+        self.postMessage({
+          type: 'model-progress',
+          progress: 100,
+          phase: `Inicialitzant a la GPU. Això pot tardar uns segons...`
+        });
+        
+        // Juntar els chunks
+        let modelBuffer: ArrayBuffer;
+        if (chunks.length > 0) {
+          const arrayBuffer = new Uint8Array(loaded);
+          let offset = 0;
+          for (const chunk of chunks) {
+            arrayBuffer.set(chunk, offset);
+            offset += chunk.length;
+          }
+          modelBuffer = arrayBuffer.buffer;
+        } else {
+          modelBuffer = await response.arrayBuffer();
+        }
+
+        const session = await ort.InferenceSession.create(modelBuffer, {
           executionProviders: [currentDevice],
           graphOptimizationLevel: 'all'
         });
@@ -86,6 +139,11 @@ async function getSession() {
           try {
              currentDevice = 'wasm';
              console.log("[Worker] Fent fallback a WASM.");
+             self.postMessage({
+               type: 'model-progress',
+               progress: 100,
+               phase: `La targeta gràfica ha fallat. Utilitzant CPU (més lent)...`
+             });
              const fallbackSession = await ort.InferenceSession.create(MODEL_URL, {
                executionProviders: ['wasm'],
                graphOptimizationLevel: 'all'
