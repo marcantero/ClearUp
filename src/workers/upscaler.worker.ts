@@ -277,7 +277,7 @@ async function upscaleImage(imageData: ImageData): Promise<ImageData> {
       
       processedTiles++;
       self.postMessage({
-        type: 'model-progress',
+        type: 'process-progress',
         progress: Math.round((processedTiles / totalTiles) * 100),
         phase: `Processant: ${processedTiles}/${totalTiles} blocs (${currentDevice})`
       });

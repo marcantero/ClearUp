@@ -26,6 +26,12 @@ export type WorkerModelProgressMessage = {
   phase?: string;
 };
 
+export type WorkerProcessProgressMessage = {
+  type: 'process-progress';
+  progress: number;
+  phase?: string;
+};
+
 export type WorkerResultMessage = {
   type: 'result';
   id: string;
@@ -47,6 +53,8 @@ export type WorkerErrorMessage = {
 export type WorkerOutgoingMessage =
   | WorkerStatusMessage
   | WorkerModelProgressMessage
+  | WorkerProcessProgressMessage
   | WorkerResultMessage
   | WorkerProcessingMessage
   | WorkerErrorMessage;
+

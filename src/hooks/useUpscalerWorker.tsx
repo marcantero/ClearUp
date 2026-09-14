@@ -18,6 +18,8 @@ export type WorkerState = {
   modelPhase?: string;
   uploadStatus: UploadStatus;
   processingStatus: ProcessingStatus;
+  processProgress?: number;
+  processPhase?: string;
 };
 
 export const IMAGE_PROCESS_ID = 'clearup-active-image-job';
@@ -59,9 +61,21 @@ export function useUpscalerWorker(
         return;
       }
 
+      if (message.type === 'process-progress') {
+        const percentage = Math.max(0, Math.min(100, Math.round(message.progress)));
+        setState((prev) => ({
+          ...prev,
+          modelStatus: 'ready',
+          processingStatus: 'processing',
+          processProgress: percentage,
+          processPhase: message.phase || `Processant... ${percentage}%`,
+        }));
+        return;
+      }
+
       if (message.type === 'status') {
         if (message.status === 'ready') {
-          setState((prev) => ({ ...prev, modelStatus: 'ready' }));
+          setState((prev) => ({ ...prev, modelStatus: 'ready', modelProgress: 100 }));
           setTimeout(() => {
             sileo.success({
               id: TOAST_MODEL_ID,
@@ -78,10 +92,21 @@ export function useUpscalerWorker(
       }
 
       if (message.type === 'processing') {
-        setState((prev) => ({
-          ...prev,
-          processingStatus: message.status === 'started' ? 'processing' : 'done',
-        }));
+        if (message.status === 'started') {
+          setState((prev) => ({
+            ...prev,
+            modelStatus: 'ready',
+            processingStatus: 'processing',
+            processProgress: 0,
+            processPhase: 'Iniciant upscaling...',
+          }));
+        } else if (message.status === 'finished') {
+          setState((prev) => ({
+            ...prev,
+            modelStatus: 'ready',
+            processingStatus: 'done',
+          }));
+        }
         return;
       }
 
@@ -95,7 +120,12 @@ export function useUpscalerWorker(
           duration: 2200,
         });
 
-        setState((prev) => ({ ...prev, processingStatus: 'done' }));
+        setState((prev) => ({
+          ...prev,
+          modelStatus: 'ready',
+          processingStatus: 'done',
+          processProgress: 100,
+        }));
         onSuccess(id, imageData);
         return;
       }
@@ -107,7 +137,11 @@ export function useUpscalerWorker(
           description: message.message,
           duration: 4000,
         });
-        setState((prev) => ({ ...prev, processingStatus: 'error' }));
+        setState((prev) => ({
+          ...prev,
+          modelStatus: 'ready',
+          processingStatus: 'error',
+        }));
       }
     };
 
@@ -134,6 +168,13 @@ export function useUpscalerWorker(
   }, [onSuccess, latestRequestIdRef]);
 
   const processImage = (id: string, imageData: ImageData) => {
+    setState((prev) => ({
+      ...prev,
+      modelStatus: 'ready',
+      processingStatus: 'processing',
+      processProgress: 0,
+      processPhase: 'Preparant imatge...',
+    }));
     workerRef.current?.postMessage({ type: 'process-image', id, imageData } as WorkerIncomingMessage);
   };
 
