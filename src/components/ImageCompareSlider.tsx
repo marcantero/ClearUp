@@ -137,32 +137,7 @@ export function ImageCompareSlider({
 
   return (
     <div className="w-full flex flex-col gap-3 transition-all duration-300">
-      {/* Top action / control bar */}
-      <div className="flex items-center justify-between px-1">
-        <div className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-          <span className="flex h-1.5 w-1.5 rounded-full bg-red-500/80 animate-pulse" />
-          <span>Drag slider to compare before & after</span>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => setIsZoomed(!isZoomed)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 shadow-sm ${
-            isZoomed
-              ? 'bg-red-500 text-white shadow-[0_0_16px_rgba(239,68,68,0.4)] ring-1 ring-red-400'
-              : 'bg-white/80 dark:bg-white/[0.05] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-white/10 hover:border-red-500/30 hover:bg-slate-100 dark:hover:bg-white/[0.08] backdrop-blur-sm'
-          }`}
-          title="Inspect fine details with interactive 2.5x zoom lens"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            <line x1="11" y1="8" x2="11" y2="14"/>
-            <line x1="8" y1="11" x2="14" y2="11"/>
-          </svg>
-          <span>{isZoomed ? 'Exit Zoom (2.5x)' : 'Inspect 2.5x Zoom'}</span>
-        </button>
-      </div>
 
       {/* Main Slider Container */}
       <div
@@ -295,9 +270,30 @@ export function ImageCompareSlider({
           </span>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 dark:bg-red-500/15 px-3 py-1 text-[11px] font-medium text-red-700 dark:text-red-300 ring-1 ring-red-500/20">
-          <span className="h-1 w-1 rounded-full bg-red-500 dark:bg-red-400" />
-          <span>Real-ESRGAN 4x · 16x pixels</span>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 dark:bg-red-500/15 px-3 py-1 text-[11px] font-medium text-red-700 dark:text-red-300 ring-1 ring-red-500/20">
+            <span className="h-1 w-1 rounded-full bg-red-500 dark:bg-red-400" />
+            <span>Real-ESRGAN 4x · 16x pixels</span>
+          </div>
+          
+          <button
+            type="button"
+            onClick={() => setIsZoomed(!isZoomed)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-200 shadow-sm ${
+              isZoomed
+                ? 'bg-red-500 text-white shadow-[0_0_16px_rgba(239,68,68,0.4)] ring-1 ring-red-400'
+                : 'bg-white/80 dark:bg-white/[0.05] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-white/10 hover:border-red-500/30 hover:bg-slate-100 dark:hover:bg-white/[0.08] backdrop-blur-sm'
+            }`}
+            title="Inspect fine details with interactive 2.5x zoom lens"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="11" y1="8" x2="11" y2="14"/>
+              <line x1="8" y1="11" x2="14" y2="11"/>
+            </svg>
+            <span className="hidden sm:inline">{isZoomed ? 'Exit Zoom (2.5x)' : 'Inspect 2.5x Zoom'}</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
