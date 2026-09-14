@@ -276,15 +276,31 @@ function App() {
           <div className="flex w-full max-w-sm flex-col items-center justify-center space-y-6 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-8 shadow-2xl dark:shadow-[0_0_80px_rgba(248,113,113,0.15)] text-center animate-[fade-in_300ms_ease-out_forwards]">
             
             <div className="relative flex h-20 w-20 items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
-              <div 
-                className="absolute inset-0 rounded-full border-4 border-transparent border-t-red-500 border-r-red-500 animate-spin transition-all duration-300"
-                style={{
-                  transform: `rotate(${((state.modelStatus === 'loading' ? state.modelProgress : state.processProgress) || 0) * 3.6}deg)`
-                }}
-              />
-              <span className="text-xl font-bold text-slate-900 dark:text-white">
-                {(state.modelStatus === 'loading' ? state.modelProgress : state.processProgress) || 0}<span className="text-sm opacity-60">%</span>
+              <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  className="text-slate-100 dark:text-slate-800"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  className="text-red-500 transition-all duration-300 ease-out"
+                  strokeDasharray={2 * Math.PI * 42}
+                  strokeDashoffset={2 * Math.PI * 42 * (1 - ((state.modelStatus === 'loading' ? state.modelProgress : state.processProgress) || 0) / 100)}
+                />
+              </svg>
+              <span className="text-xl font-bold text-slate-900 dark:text-white z-10">
+                {Math.round((state.modelStatus === 'loading' ? state.modelProgress : state.processProgress) || 0)}<span className="text-sm opacity-60">%</span>
               </span>
             </div>
 
