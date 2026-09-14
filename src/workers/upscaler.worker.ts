@@ -49,22 +49,22 @@ async function getSession() {
 
       currentDevice = isWebGPUSupported ? 'webgpu' : 'wasm';
 
-      console.log(`[Worker] Initializing ONNX session amb el dispositiu: ${currentDevice}`);
+      console.log(`[Worker] Initializing ONNX session with device: ${currentDevice}`);
       
       self.postMessage({
         type: 'status',
         status: 'loading-model',
-        message: isWebGPUSupported ? "Carregant model Real-ESRGAN (WebGPU)..." : "Carregant model Real-ESRGAN (CPU)...",
+        message: isWebGPUSupported ? "Loading Real-ESRGAN model (WebGPU)..." : "Loading Real-ESRGAN model (CPU)...",
       });
 
       self.postMessage({
         type: 'model-progress',
         progress: 0,
-        phase: `Connectant per descarregar el model...`
+        phase: `Connecting to download model...`
       });
 
       try {
-        // Descarregar manualment per tenir una barra de progrés real
+        // Download manually to provide real progress updates
         const response = await fetch(MODEL_URL);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
@@ -85,12 +85,12 @@ async function getSession() {
               loaded += value.length;
               if (total > 0) {
                 const progress = Math.round((loaded / total) * 100);
-                if (progress > lastProgress + 2) { // Refrescar cada 2% per no saturar
+                if (progress > lastProgress + 2) {
                   lastProgress = progress;
                   self.postMessage({
                     type: 'model-progress',
                     progress: progress,
-                    phase: `Descarregant model Real-ESRGAN (${currentDevice})...`
+                    phase: `Downloading Real-ESRGAN model (${currentDevice})...`
                   });
                 }
               }
@@ -101,10 +101,10 @@ async function getSession() {
         self.postMessage({
           type: 'model-progress',
           progress: 100,
-          phase: `Inicialitzant a la GPU. Això pot tardar uns segons...`
+          phase: `Initializing on GPU. This may take a few seconds...`
         });
         
-        // Juntar els chunks
+        // Assemble chunks
         let modelBuffer: ArrayBuffer;
         if (chunks.length > 0) {
           const arrayBuffer = new Uint8Array(loaded);
@@ -126,23 +126,23 @@ async function getSession() {
         self.postMessage({
           type: 'model-progress',
           progress: 100,
-          phase: `Model Real-ESRGAN preparat (${currentDevice})`
+          phase: `Real-ESRGAN model ready (${currentDevice})`
         });
 
-        console.log(`[Worker] Model carregat correctament utilitzant ${currentDevice}!`);
+        console.log(`[Worker] Model loaded successfully using ${currentDevice}!`);
         resolve(session);
       } catch (error: any) {
-        console.error(`[Worker] Error crític carregant el model amb ${currentDevice}:`, error);
+        console.error(`[Worker] Error loading model with ${currentDevice}:`, error);
         
-        // Fallback a WASM si WebGPU falla
+        // Fallback to WASM if WebGPU fails
         if (currentDevice === 'webgpu') {
           try {
              currentDevice = 'wasm';
-             console.log("[Worker] Fent fallback a WASM.");
+             console.log("[Worker] Falling back to WASM.");
              self.postMessage({
                type: 'model-progress',
                progress: 100,
-               phase: `La targeta gràfica ha fallat. Utilitzant CPU (més lent)...`
+               phase: `GPU initialization failed. Falling back to CPU (slower)...`
              });
              const fallbackSession = await ort.InferenceSession.create(MODEL_URL, {
                executionProviders: ['wasm'],
@@ -151,10 +151,10 @@ async function getSession() {
              resolve(fallbackSession);
              return;
           } catch(e) {
-             reject(new Error(`No s'ha pogut carregar el model. Detall: ${error?.message || error}`));
+             reject(new Error(`Could not load model. Details: ${error?.message || error}`));
           }
         } else {
-          reject(new Error(`No s'ha pogut carregar el model. Detall: ${error?.message || error}`));
+          reject(new Error(`Could not load model. Details: ${error?.message || error}`));
         }
       }
     });
@@ -173,14 +173,14 @@ async function initUpscaler(): Promise<void> {
     self.postMessage({
       type: 'status',
       status: 'ready',
-      message: `Model Real-ESRGAN a punt per processar (${currentDevice}).`,
+      message: `Real-ESRGAN model ready to process (${currentDevice}).`,
     });
   } catch (error: any) {
-    console.error('[Worker] Error en la inicialització:', error);
+    console.error('[Worker] Error during init:', error);
     self.postMessage({
       type: 'status',
       status: 'error',
-      message: error?.message || 'Error en inicialitzar el model. Revisa la consola.',
+      message: error?.message || 'Error initializing model. Check console.',
     });
   }
 }
@@ -333,7 +333,7 @@ async function upscaleImage(imageData: ImageData): Promise<ImageData> {
       self.postMessage({
         type: 'process-progress',
         progress: Math.round((processedTiles / totalTiles) * 100),
-        phase: `Processant: ${processedTiles}/${totalTiles} blocs (${currentDevice})`
+        phase: `Processing: ${processedTiles}/${totalTiles} tiles (${currentDevice})`
       });
     }
   }
@@ -369,11 +369,11 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
     try {
       await initUpscaler();
     } catch (error: any) {
-      console.error('[Worker] Error en init:', error);
+      console.error('[Worker] Error during init:', error);
       self.postMessage({
         type: 'status',
         status: 'error',
-        message: error?.message || "S'ha produït un error en inicialitzar el model d'IA.",
+        message: error?.message || 'An error occurred while initializing AI model.',
       });
     }
     return;
@@ -405,11 +405,11 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
         status: 'finished',
       });
     } catch (error: any) {
-      console.error('[Worker] Error en process-image:', error);
+      console.error('[Worker] Error during process-image:', error);
       self.postMessage({
         type: 'error',
         id,
-        message: error?.message || "L'IA ha fallat en processar aquesta imatge.",
+        message: error?.message || 'AI failed to process this image.',
       });
     }
   } 

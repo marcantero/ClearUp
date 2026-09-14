@@ -68,7 +68,7 @@ export function useUpscalerWorker(
           modelStatus: 'ready',
           processingStatus: 'processing',
           processProgress: percentage,
-          processPhase: message.phase || `Processant... ${percentage}%`,
+          processPhase: message.phase || `Processing... ${percentage}%`,
         }));
         return;
       }
@@ -98,7 +98,7 @@ export function useUpscalerWorker(
             modelStatus: 'ready',
             processingStatus: 'processing',
             processProgress: 0,
-            processPhase: 'Iniciant upscaling...',
+            processPhase: 'Starting upscaling...',
           }));
         } else if (message.status === 'finished') {
           setState((prev) => ({
@@ -173,7 +173,7 @@ export function useUpscalerWorker(
       modelStatus: 'ready',
       processingStatus: 'processing',
       processProgress: 0,
-      processPhase: 'Preparant imatge...',
+      processPhase: 'Preparing image...',
     }));
     workerRef.current?.postMessage({ type: 'process-image', id, imageData } as WorkerIncomingMessage);
   };
