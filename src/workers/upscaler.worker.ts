@@ -185,6 +185,39 @@ async function initUpscaler(): Promise<void> {
   }
 }
 
+function getTileCoords(length: number, tileSize: number, step: number): number[] {
+  if (length <= tileSize) {
+    return [0];
+  }
+  const coords: number[] = [];
+  for (let pos = 0; pos < length - tileSize; pos += step) {
+    coords.push(pos);
+  }
+  const lastPos = length - tileSize;
+  if (coords.length === 0 || coords[coords.length - 1] !== lastPos) {
+    coords.push(lastPos);
+  }
+  return coords;
+}
+
+function getWeight1D(
+  pos: number,
+  size: number,
+  isStartEdge: boolean,
+  isEndEdge: boolean,
+  blendRadius: number
+): number {
+  let w = 1.0;
+  if (!isStartEdge && pos < blendRadius) {
+    w = Math.min(w, 0.5 * (1 - Math.cos((Math.PI * pos) / blendRadius)));
+  }
+  if (!isEndEdge && pos >= size - blendRadius) {
+    const dist = size - 1 - pos;
+    w = Math.min(w, 0.5 * (1 - Math.cos((Math.PI * dist) / blendRadius)));
+  }
+  return w;
+}
+
 async function upscaleImage(imageData: ImageData): Promise<ImageData> {
   const session = await getSession();
   
@@ -194,46 +227,66 @@ async function upscaleImage(imageData: ImageData): Promise<ImageData> {
   
   const TILE_SIZE = 128;
   const SCALE = 4;
-  const OUT_TILE_SIZE = TILE_SIZE * SCALE;
+  const OUT_TILE_SIZE = TILE_SIZE * SCALE; // 512
+  const OVERLAP = 32; // Overlap de 32 píxels d'entrada per eliminar completament els talls
+  const STEP = TILE_SIZE - OVERLAP; // 96
+  const BLEND_RADIUS = OVERLAP * SCALE; // 128 píxels de transició suau en la sortida
   
   const outWidth = width * SCALE;
   const outHeight = height * SCALE;
-  const outClampedData = new Uint8ClampedArray(outWidth * outHeight * 4);
+  const totalPixels = outWidth * outHeight;
   
-  const numTilesX = Math.ceil(width / TILE_SIZE);
-  const numTilesY = Math.ceil(height / TILE_SIZE);
-  const totalTiles = numTilesX * numTilesY;
+  const outAccumR = new Float32Array(totalPixels);
+  const outAccumG = new Float32Array(totalPixels);
+  const outAccumB = new Float32Array(totalPixels);
+  const outWeights = new Float32Array(totalPixels);
+  const outClampedData = new Uint8ClampedArray(totalPixels * 4);
+  
+  const xCoords = getTileCoords(width, TILE_SIZE, STEP);
+  const yCoords = getTileCoords(height, TILE_SIZE, STEP);
+  const totalTiles = xCoords.length * yCoords.length;
   
   let processedTiles = 0;
   
-  for (let ty = 0; ty < numTilesY; ty++) {
-    for (let tx = 0; tx < numTilesX; tx++) {
+  for (const startY of yCoords) {
+    const isTopEdge = startY === 0;
+    const isBottomEdge = startY + TILE_SIZE >= height;
+    
+    // Precalcular pesos verticals per la fila
+    const weightsY = new Float32Array(OUT_TILE_SIZE);
+    for (let y = 0; y < OUT_TILE_SIZE; y++) {
+      weightsY[y] = getWeight1D(y, OUT_TILE_SIZE, isTopEdge, isBottomEdge, BLEND_RADIUS);
+    }
+
+    for (const startX of xCoords) {
+      const isLeftEdge = startX === 0;
+      const isRightEdge = startX + TILE_SIZE >= width;
+      
+      // Precalcular pesos horitzontals per la columna
+      const weightsX = new Float32Array(OUT_TILE_SIZE);
+      for (let x = 0; x < OUT_TILE_SIZE; x++) {
+        weightsX[x] = getWeight1D(x, OUT_TILE_SIZE, isLeftEdge, isRightEdge, BLEND_RADIUS);
+      }
+
       const tileFloat32Data = new Float32Array(1 * numChannels * TILE_SIZE * TILE_SIZE);
       
-      const startX = tx * TILE_SIZE;
-      const startY = ty * TILE_SIZE;
-      
-      // Extreure el tile (omplint amb 0 si ens passem de la imatge)
+      // Extreure el tile amb clamp (replicate padding) per no generar línies negres a les vores
       for (let y = 0; y < TILE_SIZE; y++) {
+        const clampedY = Math.min(height - 1, Math.max(0, startY + y));
+        const srcRowOffset = clampedY * width;
+        const tileRowOffset = y * TILE_SIZE;
+        
         for (let x = 0; x < TILE_SIZE; x++) {
-          const imgY = startY + y;
-          const imgX = startX + x;
+          const clampedX = Math.min(width - 1, Math.max(0, startX + x));
+          const srcIndex = (srcRowOffset + clampedX) * 4;
           
-          let r = 0, g = 0, b = 0;
-          if (imgX < width && imgY < height) {
-            const srcIndex = (imgY * width + imgX) * 4;
-            r = imageData.data[srcIndex] / 255.0;
-            g = imageData.data[srcIndex + 1] / 255.0;
-            b = imageData.data[srcIndex + 2] / 255.0;
-          }
+          const r = imageData.data[srcIndex] / 255.0;
+          const g = imageData.data[srcIndex + 1] / 255.0;
+          const b = imageData.data[srcIndex + 2] / 255.0;
           
-          const dstIndexR = 0 * (TILE_SIZE * TILE_SIZE) + y * TILE_SIZE + x;
-          const dstIndexG = 1 * (TILE_SIZE * TILE_SIZE) + y * TILE_SIZE + x;
-          const dstIndexB = 2 * (TILE_SIZE * TILE_SIZE) + y * TILE_SIZE + x;
-          
-          tileFloat32Data[dstIndexR] = r;
-          tileFloat32Data[dstIndexG] = g;
-          tileFloat32Data[dstIndexB] = b;
+          tileFloat32Data[0 * (TILE_SIZE * TILE_SIZE) + tileRowOffset + x] = r;
+          tileFloat32Data[1 * (TILE_SIZE * TILE_SIZE) + tileRowOffset + x] = g;
+          tileFloat32Data[2 * (TILE_SIZE * TILE_SIZE) + tileRowOffset + x] = b;
         }
       }
       
@@ -242,36 +295,37 @@ async function upscaleImage(imageData: ImageData): Promise<ImageData> {
       const feeds: Record<string, ort.Tensor> = {};
       feeds[session.inputNames[0]] = inputTensor;
       
-      // Executar el model només pel tile
       const results = await session.run(feeds);
       const outputTensor = results[session.outputNames[0]];
       const outFloat32Data = outputTensor.data as Float32Array;
       
-      // Col·locar el tile de sortida a la imatge final
-      for (let y = 0; y < OUT_TILE_SIZE; y++) {
-        for (let x = 0; x < OUT_TILE_SIZE; x++) {
-          const outImgY = startY * SCALE + y;
-          const outImgX = startX * SCALE + x;
+      // Acumular el resultat amb barreja sinusoidal suau (sense costures)
+      const tileWOut = Math.min(OUT_TILE_SIZE, outWidth - startX * SCALE);
+      const tileHOut = Math.min(OUT_TILE_SIZE, outHeight - startY * SCALE);
+      
+      for (let y = 0; y < tileHOut; y++) {
+        const wy = weightsY[y];
+        if (wy <= 0) continue;
+        
+        const outY = startY * SCALE + y;
+        const rowOffset = outY * outWidth;
+        const tileRowOffset = y * OUT_TILE_SIZE;
+        
+        for (let x = 0; x < tileWOut; x++) {
+          const w = wy * weightsX[x];
+          if (w <= 0) continue;
           
-          if (outImgX < outWidth && outImgY < outHeight) {
-            const rIndex = 0 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + y * OUT_TILE_SIZE + x;
-            const gIndex = 1 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + y * OUT_TILE_SIZE + x;
-            const bIndex = 2 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + y * OUT_TILE_SIZE + x;
-            
-            let r = outFloat32Data[rIndex] * 255.0;
-            let g = outFloat32Data[gIndex] * 255.0;
-            let b = outFloat32Data[bIndex] * 255.0;
-            
-            r = Math.max(0, Math.min(255, Math.round(r)));
-            g = Math.max(0, Math.min(255, Math.round(g)));
-            b = Math.max(0, Math.min(255, Math.round(b)));
-            
-            const dstIndex = (outImgY * outWidth + outImgX) * 4;
-            outClampedData[dstIndex] = r;
-            outClampedData[dstIndex + 1] = g;
-            outClampedData[dstIndex + 2] = b;
-            outClampedData[dstIndex + 3] = 255;
-          }
+          const outX = startX * SCALE + x;
+          const dstIndex = rowOffset + outX;
+          
+          const rIndex = 0 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + tileRowOffset + x;
+          const gIndex = 1 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + tileRowOffset + x;
+          const bIndex = 2 * (OUT_TILE_SIZE * OUT_TILE_SIZE) + tileRowOffset + x;
+          
+          outAccumR[dstIndex] += outFloat32Data[rIndex] * w;
+          outAccumG[dstIndex] += outFloat32Data[gIndex] * w;
+          outAccumB[dstIndex] += outFloat32Data[bIndex] * w;
+          outWeights[dstIndex] += w;
         }
       }
       
@@ -282,6 +336,22 @@ async function upscaleImage(imageData: ImageData): Promise<ImageData> {
         phase: `Processant: ${processedTiles}/${totalTiles} blocs (${currentDevice})`
       });
     }
+  }
+  
+  // Normalitzar cada píxel per la suma dels seus pesos (fusió perfecta)
+  for (let i = 0; i < totalPixels; i++) {
+    const w = outWeights[i];
+    const invW = w > 0 ? 1.0 / w : 1.0;
+    
+    const r = Math.round(outAccumR[i] * invW * 255.0);
+    const g = Math.round(outAccumG[i] * invW * 255.0);
+    const b = Math.round(outAccumB[i] * invW * 255.0);
+    
+    const dst = i * 4;
+    outClampedData[dst] = Math.max(0, Math.min(255, r));
+    outClampedData[dst + 1] = Math.max(0, Math.min(255, g));
+    outClampedData[dst + 2] = Math.max(0, Math.min(255, b));
+    outClampedData[dst + 3] = 255;
   }
   
   return new ImageData(outClampedData, outWidth, outHeight);
