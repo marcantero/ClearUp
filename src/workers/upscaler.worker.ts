@@ -27,13 +27,50 @@ ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 let initialized = false;
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 let currentDevice = 'wasm'; 
+let loadedModelId: string | null = null;
+let currentTileSize = 128;
 
-// Utilitzem un model Real-ESRGAN x4 en format ONNX publicat a HuggingFace
-const MODEL_URL = 'https://huggingface.co/KingPro100/real-esrgan-onxx/resolve/main/Real-ESRGAN-x4plus.onnx';
+async function determineOptimalTileSize(): Promise<number> {
+  if (!navigator.gpu) return 128; // Fallback a CPU/WASM seguro
 
-async function getSession() {
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) return 128;
+
+    // Convertimos el límite de binding a Megabytes
+    const maxBufferMB = adapter.limits.maxStorageBufferBindingSize / (1024 * 1024);
+    
+    // Información descriptiva (ej. "NVIDIA GeForce GTX 1060 6GB", "Apple M2", etc.)
+    const info = await adapter.requestAdapterInfo();
+    const gpuName = info.description.toLowerCase();
+
+    // Si es una gráfica dedicada potente o tiene un buffer enorme
+    if (maxBufferMB >= 1024 || gpuName.includes('nvidia') || gpuName.includes('rtx') || gpuName.includes('rx ')) {
+      return 256; 
+    }
+
+    return 128; // Gráficas integradas o móviles
+  } catch (e) {
+    return 128; // Si falla la consulta, nos curamos en salud
+  }
+}
+
+const MODEL_URLS: Record<string, string> = {
+  'real-esrgan-x4plus': 'https://huggingface.co/KingPro100/real-esrgan-onxx/resolve/main/Real-ESRGAN-x4plus.onnx',
+  'realesr-general-x4v3': 'https://huggingface.co/CoderViking/realesr-general-x4v3-onnx/resolve/main/realesr-general-x4v3.onnx',
+  'realesrgan-anime': 'https://huggingface.co/deepghs/imgutils-models/resolve/main/real_esrgan/RealESRGAN_x4plus_anime_6B.onnx'
+};
+
+async function getSession(modelId: string = 'real-esrgan-x4plus') {
+  if (loadedModelId !== modelId) {
+    sessionPromise = null;
+    initialized = false;
+  }
+
   if (!sessionPromise) {
     sessionPromise = new Promise(async (resolve, reject) => {
+      loadedModelId = modelId;
+      const modelUrl = MODEL_URLS[modelId] || MODEL_URLS['real-esrgan-x4plus'];
       let isWebGPUSupported = false;
       try {
         if (navigator.gpu) {
@@ -65,7 +102,7 @@ async function getSession() {
 
       try {
         // Download manually to provide real progress updates
-        const response = await fetch(MODEL_URL);
+        const response = await fetch(modelUrl);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const contentLength = response.headers.get('content-length');
@@ -118,11 +155,34 @@ async function getSession() {
           modelBuffer = await response.arrayBuffer();
         }
 
-        const session = await ort.InferenceSession.create(modelBuffer, {
+        let session = await ort.InferenceSession.create(modelBuffer, {
           executionProviders: [currentDevice],
           graphOptimizationLevel: 'all'
         });
         
+        if (currentDevice === 'webgpu') {
+          currentTileSize = await determineOptimalTileSize();
+          try {
+            self.postMessage({
+              type: 'model-progress',
+              progress: 100,
+              phase: `Warming up WebGPU with ${currentTileSize}x${currentTileSize} tile...`
+            });
+            const dummyArray = new Float32Array(1 * 3 * currentTileSize * currentTileSize);
+            const dummyInput = new ort.Tensor('float32', dummyArray, [1, 3, currentTileSize, currentTileSize]);
+            const inputName = session.inputNames[0];
+            await session.run({ [inputName]: dummyInput });
+            console.log(`[Worker] Warm-up exitoso a ${currentTileSize}x${currentTileSize}`);
+          } catch (error) {
+            console.warn(`[Worker] Fallo de memoria en ${currentTileSize}x${currentTileSize}. Haciendo fallback a 128x128.`);
+            await session.release(); 
+            session = await ort.InferenceSession.create(modelBuffer, { executionProviders: ['webgpu'] });
+            currentTileSize = 128; 
+          }
+        } else {
+          currentTileSize = 128;
+        }
+
         self.postMessage({
           type: 'model-progress',
           progress: 100,
@@ -144,7 +204,7 @@ async function getSession() {
                progress: 100,
                phase: `GPU initialization failed. Falling back to CPU (slower)...`
              });
-             const fallbackSession = await ort.InferenceSession.create(MODEL_URL, {
+             const fallbackSession = await ort.InferenceSession.create(modelUrl, {
                executionProviders: ['wasm'],
                graphOptimizationLevel: 'all'
              });
@@ -162,13 +222,13 @@ async function getSession() {
   return sessionPromise;
 }
 
-async function initUpscaler(): Promise<void> {
-  if (initialized) {
+async function initUpscaler(modelId?: string): Promise<void> {
+  if (initialized && (!modelId || loadedModelId === modelId)) {
     return;
   }
 
   try {
-    await getSession();
+    await getSession(modelId);
     initialized = true;
     self.postMessage({
       type: 'status',
@@ -218,19 +278,19 @@ function getWeight1D(
   return w;
 }
 
-async function upscaleImage(imageData: ImageData): Promise<ImageData> {
-  const session = await getSession();
+async function upscaleImage(imageData: ImageData, modelId?: string): Promise<ImageData> {
+  const session = await getSession(modelId);
   
   const width = imageData.width;
   const height = imageData.height;
   const numChannels = 3; // RGB
   
-  const TILE_SIZE = 128;
+  const TILE_SIZE = currentTileSize;
   const SCALE = 4;
-  const OUT_TILE_SIZE = TILE_SIZE * SCALE; // 512
-  const OVERLAP = 32; // Overlap de 32 píxels d'entrada per eliminar completament els talls
-  const STEP = TILE_SIZE - OVERLAP; // 96
-  const BLEND_RADIUS = OVERLAP * SCALE; // 128 píxels de transició suau en la sortida
+  const OUT_TILE_SIZE = TILE_SIZE * SCALE; 
+  const OVERLAP = 32; // Overlap constante de 32 píxels
+  const STEP = TILE_SIZE - OVERLAP; 
+  const BLEND_RADIUS = OVERLAP * SCALE; // Radio de fusión en la salida
   
   const outWidth = width * SCALE;
   const outHeight = height * SCALE;
@@ -367,7 +427,7 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
 
   if (message.type === 'init') {
     try {
-      await initUpscaler();
+      await initUpscaler(message.modelId);
     } catch (error: any) {
       console.error('[Worker] Error during init:', error);
       self.postMessage({
@@ -380,7 +440,7 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
   }
 
   if (message.type === 'process-image') {
-    const { id, imageData } = message;
+    const { id, imageData, modelId } = message;
 
     self.postMessage({
       type: 'processing',
@@ -389,9 +449,9 @@ self.onmessage = async (event: MessageEvent<PostableMessage>) => {
     });
 
     try {
-      await initUpscaler();
+      await initUpscaler(modelId);
 
-      const output = await upscaleImage(imageData);
+      const output = await upscaleImage(imageData, modelId);
 
       self.postMessage({
         type: 'result',

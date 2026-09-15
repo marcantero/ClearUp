@@ -158,7 +158,6 @@ export function useUpscalerWorker(
     worker.addEventListener('message', handleMessage);
     worker.addEventListener('error', handleError);
     worker.postMessage({ type: 'reset' } as WorkerIncomingMessage);
-    worker.postMessage({ type: 'init' } as WorkerIncomingMessage);
 
     return () => {
       worker.removeEventListener('message', handleMessage);
@@ -167,15 +166,15 @@ export function useUpscalerWorker(
     };
   }, [onSuccess, latestRequestIdRef]);
 
-  const processImage = (id: string, imageData: ImageData) => {
+  const processImage = (id: string, imageData: ImageData, modelId: string) => {
     setState((prev) => ({
       ...prev,
-      modelStatus: 'ready',
+      modelStatus: 'loading',
       processingStatus: 'processing',
       processProgress: 0,
       processPhase: 'Preparing image...',
     }));
-    workerRef.current?.postMessage({ type: 'process-image', id, imageData } as WorkerIncomingMessage);
+    workerRef.current?.postMessage({ type: 'process-image', id, imageData, modelId } as WorkerIncomingMessage);
   };
 
   return { state, setState, processImage };

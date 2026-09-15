@@ -39,6 +39,7 @@ function App() {
   const [originalSrc, setOriginalSrc] = useState<string | null>(null);
   const [processedSrc, setProcessedSrc] = useState<string | null>(null);
   const [animationKey, setAnimationKey] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('real-esrgan-x4plus');
 
   const latestRequestIdRef = useRef<string | null>(null);
 
@@ -62,7 +63,7 @@ function App() {
 
       const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       latestRequestIdRef.current = requestId;
-      processImage(requestId, imageData);
+      processImage(requestId, imageData, selectedModel);
       setState((prev) => ({ ...prev, processingStatus: 'processing' }));
     } catch {
       sileo.error({ title: 'File error', description: 'Could not load image.' });
@@ -200,8 +201,33 @@ function App() {
               </p>
             </div>
 
+            <div className="flex flex-col gap-3">
+              <label className="text-sm font-semibold text-slate-900 dark:text-white">Select AI Model</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { id: 'real-esrgan-x4plus', name: 'Real-ESRGAN x4+', desc: 'Best for general photos and complex textures' },
+                  { id: 'realesr-general-x4v3', name: 'RealESR General v3', desc: 'Safer, less aggressive sharpening' },
+                  { id: 'realesrgan-anime', name: 'Real-ESRGAN Anime', desc: 'Optimized for anime, manga, and 2D illustrations' }
+                ].map(model => (
+                  <button
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    disabled={isProcessing}
+                    className={`flex flex-col text-left p-3.5 rounded-xl border transition-all ${
+                      selectedModel === model.id 
+                        ? 'border-red-500 bg-red-50 dark:bg-red-500/10 ring-1 ring-red-500 shadow-sm' 
+                        : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 bg-white dark:bg-white/[0.02]'
+                    } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className={`text-sm font-semibold ${selectedModel === model.id ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>{model.name}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{model.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <section className="rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-white/[0.03] p-5 shadow-sm dark:shadow-none transition-all">
-              <Dropzone onFileSelected={onFileSelected} disabled={isProcessing || state.modelStatus === 'idle' || state.modelStatus === 'loading'} />
+              <Dropzone onFileSelected={onFileSelected} disabled={isProcessing || state.modelStatus === 'loading'} />
             </section>
 
             {originalSrc && (

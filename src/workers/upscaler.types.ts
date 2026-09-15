@@ -1,5 +1,5 @@
 // Types shared with main thread (sense dependències externes)
-export type WorkerInitMessage = { type: 'init' };
+export type WorkerInitMessage = { type: 'init'; modelId?: string };
 export type WorkerResetMessage = { type: 'reset' };
 export type WorkerProcessMessage = {
   type: 'process-image';
@@ -10,6 +10,7 @@ export type WorkerProcessMessage = {
    * Higher values treat more colours as background.
    */
   threshold?: number;
+  modelId?: string;
 };
 
 export type WorkerIncomingMessage = WorkerInitMessage | WorkerResetMessage | WorkerProcessMessage;
